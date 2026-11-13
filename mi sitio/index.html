@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="estilo.css">
 <!-- SDK de Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
 </head>
 <body>
 
@@ -66,6 +65,11 @@
 </div>
 
 <script>
+    // Inicialización directa de Supabase con tus credenciales
+    const SUPABASE_URL = 'https://fmigdihgvuucrxlvzpsr.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_zvlmkTnpzKg86-lSIhi7LA_kU762eYd';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
     function val(id) {
         return document.getElementById(id).value.trim();
     }
@@ -118,7 +122,7 @@
             return msg('ml-reg', 'Error: ' + error.message, false);
         }
 
-        msg('ml-reg', '¡Cuenta creada con éxito! Redirigindo al inicio...', true);
+        msg('ml-reg', '¡Cuenta creada con éxito! Redirigiendo al inicio...', true);
         
         // Espera 2 segundos y manda al usuario de regreso al login
         setTimeout(() => {
@@ -129,7 +133,7 @@
         }, 2000);
     }
 
-    // Función de Inicio de Sesión con validaciones básicas
+    // Función de Inicio de Sesión
     async function entrar() {
         const email = val('login-email');
         const pass = val('login-pass');
