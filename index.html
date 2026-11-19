@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi sitio - Portal</title>
+<!-- Hoja de estilos externa -->
+<link rel="stylesheet" href="estilo.css">
+<!-- SDK de Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<nav>
+    <a href="index.html">Inicio</a>
+    <a href="catalogo.html">Catálogo</a>
+    <a href="acerca.html">Acerca</a>
+</nav>
+
+<div class="container">
+    <h1>Mi primer sitio web</h1>
+    <p>Hola, soy Jhovani. Administra tus accesos de forma segura.</p>
+
+    <!-- 1. SECCIÓN DE INICIO DE SESIÓN (LOGIN) -->
+    <div id="login-section">
+        <h3 style="margin-top:0; font-size: 1.2rem;">Iniciar Sesión</h3>
+        <div class="form-group">
+            <input type="email" id="login-email" placeholder="Correo electrónico">
+            <input type="password" id="login-pass" placeholder="Contraseña">
+        </div>
+        <div class="btn-container">
+            <button class="btn-primary" onclick="entrar()">Entrar</button>
+            <button class="btn-secondary" onclick="mostrarSeccion('register-section')">Crear cuenta nueva</button>
+        </div>
+        <div id="ml-login"></div>
+    </div>
+
+    <!-- 2. SECCIÓN DE REGISTRO (Oculta por defecto) -->
+    <div id="register-section" style="display:none;">
+        <h3 style="margin-top:0; font-size: 1.2rem;">Registro de Usuario</h3>
+        <div class="form-group">
+            <input type="email" id="reg-email" placeholder="Correo electrónico">
+            <input type="password" id="reg-pass" placeholder="Contraseña (mínimo 6 caracteres)">
+            <input type="password" id="reg-pass-confirm" placeholder="Confirma tu contraseña">
+        </div>
+        <div class="btn-container">
+            <button class="btn-primary" onclick="registrar()">Registrarse</button>
+            <button class="btn-secondary" onclick="mostrarSeccion('login-section')">Volver al inicio</button>
+        </div>
+        <div id="ml-reg"></div>
+    </div>
+
+    <!-- 3. PANEL DE LA APLICACIÓN (Oculto hasta iniciar sesión) -->
+    <div id="app-section" style="display:none;">
+        <h3 style="margin-top:0; font-size: 1.2rem;">Panel de Solicitudes</h3>
+        <p class="usuario">Sesión iniciada como: <strong id="usuario-email"></strong></p>
+        <div class="form-group">
+            <input type="text" id="titulo" placeholder="Título de la solicitud">
+            <input type="number" id="monto" placeholder="Monto">
+        </div>
+        <div class="btn-container">
+            <button class="btn-primary" onclick="crearSolicitud()">Guardar</button>
+            <button class="btn-secondary" onclick="salir()">Cerrar Sesión</button>
+        </div>
+        <div id="ml-app"></div>
+
+        <h4 class="subtitulo">Solicitudes registradas</h4>
+        <ul id="lista-solicitudes"></ul>
+    </div>
+</div>
+
+<script>
+    // Inicialización directa de Supabase con tus credenciales
+    const SUPABASE_URL = 'https://fmigdihgvuucrxlvzpsr.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_zvlmkTnpzKg86-lSIhi7LA_kU762eYd';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function val(id) {
+        return document.getElementById(id).value.trim();
+    }
+
+    function msg(id, texto, esExito) {
+        const el = document.getElementById(id);
+        el.innerText = texto;
+        el.style.color = esExito ? '#16a34a' : '#dc2626';
+    }
+
+    // Control para alternar entre vistas de manera limpia
+    function mostrarSeccion(seccionId) {
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('register-section').style.display = 'none';
+        document.getElementById('app-section').style.display = 'none';
+        
+        document.getElementById(seccionId).style.display = 'block';
+        
+        // Limpiar mensajes al cambiar de sección
+        document.getElementById('ml-login').innerText = '';
+        document.getElementById('ml-reg').innerText = '';
+        document.getElementById('ml-app').innerText = '';
+    }
+
+    // Muestra el panel solo si hay un usuario con sesión válida
+    async function mostrarApp() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return mostrarSeccion('login-section');
+
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('register-section').style.display = 'none';
+        document.getElementById('app-section').style.display = 'block';
+        document.getElementById('usuario-email').textContent = user.email;
+        cargarSolicitudes();
+    }
+
+    // Lista las solicitudes (por ahora se ven las de todos; Módulo 4 lo restringe)
+    async function cargarSolicitudes() {
+        const lista = document.getElementById('lista-solicitudes');
+        const { data, error } = await supabase
+            .from('solicitudes')
+            .select('titulo, monto, usuario_email');
+
+        lista.innerHTML = '';
+        if (error) return msg('ml-app', 'No se pudieron cargar las solicitudes: ' + error.message, false);
+        if (!data.length) {
+            const li = document.createElement('li');
+            li.textContent = 'Aún no hay solicitudes.';
+            lista.appendChild(li);
+            return;
+        }
+        data.forEach(s => {
+            // textContent (no innerHTML) para no ejecutar HTML que alguien haya escrito en el título
+            const li = document.createElement('li');
+            li.textContent = `${s.titulo} — $${s.monto} (${s.usuario_email || 'sin correo'})`;
+            lista.appendChild(li);
+        });
+    }
+
+    // Función de Registro con Validaciones
+    async function registrar() {
+        const email = val('reg-email');
+        const pass = val('reg-pass');
+        const passConfirm = val('reg-pass-confirm');
+
+        // Validaciones previas
+        if (!email || !pass || !passConfirm) {
+            return msg('ml-reg', 'Por favor llena todos los campos.', false);
+        }
+        if (pass.length < 6) {
+            return msg('ml-reg', 'La contraseña debe tener al menos 6 caracteres.', false);
+        }
+        if (pass !== passConfirm) {
+            return msg('ml-reg', 'Las contraseñas no coinciden.', false);
+        }
+
+        const { error } = await supabase.auth.signUp({ email, password: pass });
+        
+        if (error) {
+            return msg('ml-reg', 'Error: ' + error.message, false);
+        }
+
+        msg('ml-reg', '¡Cuenta creada con éxito! Redirigiendo al inicio...', true);
+        
+        // Espera 2 segundos y manda al usuario de regreso al login
+        setTimeout(() => {
+            document.getElementById('reg-email').value = '';
+            document.getElementById('reg-pass').value = '';
+            document.getElementById('reg-pass-confirm').value = '';
+            mostrarSeccion('login-section');
+        }, 2000);
+    }
+
+    // Función de Inicio de Sesión
+    async function entrar() {
+        const email = val('login-email');
+        const pass = val('login-pass');
+
+        if (!email || !pass) {
+            return msg('ml-login', 'Ingresa tu correo y contraseña.', false);
+        }
+
+        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        
+        if (error) {
+            return msg('ml-login', 'Credenciales incorrectas.', false);
+        }
+        
+        mostrarApp();
+    }
+
+    // Cerrar sesión
+    async function salir() {
+        await supabase.auth.signOut();
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-pass').value = '';
+        mostrarSeccion('login-section');
+        msg('ml-login', 'Sesión cerrada.', true);
+    }
+
+    // Crear solicitud asociada al usuario actual
+    async function crearSolicitud() {
+        const titulo = val('titulo');
+        const monto = Number(val('monto'));
+
+        if (!titulo || !val('monto') || isNaN(monto)) {
+            return msg('ml-app', 'Completa el título y un monto válido.', false);
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return mostrarSeccion('login-section');
+
+        const { error } = await supabase.from('solicitudes').insert({
+            titulo,
+            monto,
+            usuario_email: user.email
+        });
+
+        if (error) {
+            msg('ml-app', 'Error al guardar: ' + error.message, false);
+        } else {
+            msg('ml-app', 'Solicitud guardada con éxito.', true);
+            document.getElementById('titulo').value = '';
+            document.getElementById('monto').value = '';
+            cargarSolicitudes();
+        }
+    }
+
+    // Validar sesión al cargar la página: con sesión entra directo, sin sesión pide login
+    (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) mostrarApp();
+        else mostrarSeccion('login-section');
+    })();
+
+    // Si la sesión expira o se cierra en otra pestaña, regresa al login
+    supabase.auth.onAuthStateChange((evento) => {
+        if (evento === 'SIGNED_OUT') mostrarSeccion('login-section');
+    });
+</script>
+
+</body>
+</html>
